@@ -109,6 +109,10 @@ outputs/           运行产物（自动生成，不入库）
 
 机械臂的连杆尺寸（底座到肩轴 95 mm、肩侧偏 30 mm、大臂 116 mm、小臂 135 mm、腕到 TCP 110 mm）取自开源项目 [SO-101](https://github.com/huggingface/lerobot)（Hugging Face LeRobot，Apache-2.0）的公开 URDF，按实测几何简化成 DH 参数与 MJCF。夹爪是简化的平行两指模型，不对应具体实物结构。
 
+## 许可证
+
+MIT，见 [LICENSE](LICENSE)。机械臂几何尺寸来自 SO-101（Hugging Face LeRobot，Apache-2.0）。
+
 ## 局限
 
 - 只有位置控制，没有力控；夹爪的夹持力靠一个固定的力上限近似

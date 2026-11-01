@@ -76,6 +76,76 @@ def add_rounded_box(spec, name, half, roundness=4.0, nu=48, nv=24,
     return mesh
 
 
+def torus(R=1.0, r=0.2, nu=48, nv=20):
+    """圆环。用来做垫圈、轴承环、O 圈 —— 这些东西小，但少了整机就"假"。"""
+    verts = []
+    faces = []
+    for j in range(nv):
+        v = 2 * np.pi * j / nv
+        for i in range(nu):
+            u = 2 * np.pi * i / nu
+            verts.append([(R + r * np.cos(v)) * np.cos(u),
+                          (R + r * np.cos(v)) * np.sin(u),
+                          r * np.sin(v)])
+    for j in range(nv):
+        j2 = (j + 1) % nv
+        for i in range(nu):
+            i2 = (i + 1) % nu
+            p0 = j * nu + i
+            p1 = j * nu + i2
+            p2 = j2 * nu + i2
+            p3 = j2 * nu + i
+            faces += [p0, p1, p2, p0, p2, p3]
+    return np.array(verts), np.array(faces, dtype=np.int32)
+
+
+def prism(sides=6, radius=1.0, half_height=1.0):
+    """
+    多棱柱。六角用 sides=6 —— 螺栓头就是这个形，
+    用圆柱代替虽然远看差不多，但近景一眼假。
+    """
+    verts = []
+    faces = []
+    for z in (-half_height, half_height):
+        for i in range(sides):
+            u = 2 * np.pi * i / sides + np.pi / sides
+            verts.append([radius * np.cos(u), radius * np.sin(u), z])
+    for i in range(sides):
+        i2 = (i + 1) % sides
+        faces += [i, i2, sides + i2, i, sides + i2, sides + i]     # 侧面
+    # 端面（扇形）
+    c0 = len(verts)
+    verts.append([0, 0, half_height])
+    c1 = len(verts)
+    verts.append([0, 0, -half_height])
+    for i in range(sides):
+        i2 = (i + 1) % sides
+        faces += [c0, sides + i, sides + i2]
+        faces += [c1, i2, i]
+    return np.array(verts), np.array(faces, dtype=np.int32)
+
+
+def add_mesh(spec, name, verts, faces, smooth=True):
+    """通用注册。前面几个生成器都返回 (verts, faces)，统一从这里进 MuJoCo。"""
+    mesh = spec.add_mesh()
+    mesh.name = name
+    mesh.uservert = np.asarray(verts, float).reshape(-1).tolist()
+    mesh.userface = np.asarray(faces, np.int32).reshape(-1).tolist()
+    mesh.smoothnormal = smooth
+    mesh.maxhullvert = 4096
+    return mesh
+
+
+def add_torus(spec, name, R, r, nu=48, nv=20):
+    v, f = torus(R, r, nu, nv)
+    return add_mesh(spec, name, v, f)
+
+
+def add_prism(spec, name, sides, radius, half_height):
+    v, f = prism(sides, radius, half_height)
+    return add_mesh(spec, name, v, f, smooth=False)
+
+
 def add_cylinder_mesh(spec, name, radius, half_height, nu=40, nv=2):
     """
     真正的圆柱（不是超椭球近似的）。nv=2 表示侧面只分两段，圆盘用扇形补。

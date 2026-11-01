@@ -58,10 +58,11 @@ src/
   view3d.py        实时窗口 / 离屏录制 / 静态截图
 models/
   so101.xml        5 关节 MJCF（关重力、无接触，作为第 2 级的基准模型）
-best/              高质量版本（圆角网格 + PBR 材质 + 非理想执行器）
+best/              高质量版本（结构组装 + PBR 材质 + 非理想执行器）
   scene.py         场景：纹理、桌面、灯光、相机
-  robot.py         SO-101 外观重建（运动学不变）
-  meshgen.py       程序化网格生成（超椭球、圆柱）
+  robot.py         SO-101 结构组装（94 个零件，运动学不变）
+  parts.py         零件库：舵机、螺栓、法兰、镂空梁、线缆
+  meshgen.py       程序化网格生成（超椭球、圆柱、圆环、棱柱）
   textures.py      程序化纹理（层纹、木纹、金属）
   control.py       轨迹、舵机模型、抓取状态机
   demo.py          主程序

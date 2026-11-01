@@ -41,7 +41,7 @@ FINGER_KP = 300.0          # 位置伺服刚度。太小的话"夹住"其实只�
 FINGER_KV = 15.0
 # 单指最大夹持力（N）。真舵机堵转力矩有限，不设上限位置伺服会一直加力，
 # 轻物体直接被弹飞。这个值是抓取能力的主要瓶颈，见 eval_grasp 的归因实验。
-GRIPPER_FORCE = 3.0
+GRIPPER_FORCE = 8.0
 
 # 接触位掩码。被抓物用物体那一组，见模块开头的说明。
 GRIPPER_CONTYPE = 1
@@ -77,7 +77,7 @@ def add_gripper(spec):
         geom.rgba = [0.85, 0.35, 0.15, 1.0]
         geom.contype = GRIPPER_CONTYPE
         geom.conaffinity = GRIPPER_CONAFFINITY
-        geom.friction = [1.2, 0.01, 0.001]      # 指尖要吃住物体，摩擦给高一点
+        geom.friction = [2.0, 0.02, 0.002]      # 指尖要吃住物体，摩擦给高一点
         geom.solref = [0.005, 0.8]              # 硬一点的接触刚度，否则物体像橡皮
 
     # 联动：j6_l 与 j6_r 同号等值（两者轴向相反，所以看起来是镜像开合）

@@ -97,7 +97,7 @@ def add_gripper(spec):
     # 夹持力上限。真舵机堵转力矩有限，不设上限的话位置伺服会一直加力，
     # 轻物体直接被弹飞。3 N 大致相当于 STS3215 在 7.4V 下的合理上限。
     act.forcelimited = True
-    act.forcerange = [-3.0, 3.0]
+    act.forcerange = [-GRIPPER_FORCE, GRIPPER_FORCE]
 
 
 def add_floor(spec):

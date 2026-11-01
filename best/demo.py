@@ -34,6 +34,7 @@ import mujoco.viewer  # noqa: E402
 from PIL import Image  # noqa: E402
 
 import control  # noqa: E402
+import postfx  # noqa: E402
 import grasp_ik  # noqa: E402
 import scene  # noqa: E402
 
@@ -167,26 +168,44 @@ def make_camera(model, aspect=16 / 9):
 
 
 # ---------------------------------------------------------------- 渲染
-def render_still(demo, width=1280, height=720, out=None):
+def _render_pair(renderer, data, cam):
+    """渲一帧 RGB + 一帧深度。深度用来做景深，切模式要重新 render。"""
+    renderer.update_scene(data, camera=cam)
+    renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SKYBOX] = False
+    rgb = renderer.render()
+
+    renderer.enable_depth_rendering()
+    depth = renderer.render()
+    renderer.disable_depth_rendering()
+    return rgb, depth
+
+
+def render_still(demo, width=1280, height=720, out=None, film=True):
     """跑到"抬起完成"再截图，展示的是夹着物体悬空的状态，比空爪有说服力。"""
     renderer = mujoco.Renderer(demo.model, height, width)
     t_lift_end = 2.0 + 1.1 + 0.9 + 0.5 + 1.9
     for _ in range(int(t_lift_end / demo.model.opt.timestep)):
         demo.step()
     cam = make_camera(demo.model)
-    renderer.update_scene(demo.data, camera=cam)
-    renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SKYBOX] = False
-    img = renderer.render()
+    rgb, depth = _render_pair(renderer, demo.data, cam)
     renderer.close()
 
-    out = out or os.path.join(OUT_DIR, "best_still.png")
     os.makedirs(OUT_DIR, exist_ok=True)
+    out = out or os.path.join(OUT_DIR, "best_still.png")
+
+    # 同时存一张"未处理"的，方便对比后处理到底做了什么
+    raw = out.replace(".png", "_raw.png")
+    Image.fromarray(rgb).save(raw)
+
+    img = postfx.apply(rgb, depth, dof_focus=0.52) if film else rgb
     Image.fromarray(img).save(out)
     print("静帧已保存：", out)
+    print("原图（未后处理）：", raw)
     return out
 
 
-def render_video(demo, fps=30, width=1280, height=720, out_name="best_grasp"):
+def render_video(demo, fps=30, width=1280, height=720, out_name="best_grasp",
+                 film=True):
     renderer = mujoco.Renderer(demo.model, height, width)
     cam = make_camera(demo.model)
     dt = demo.model.opt.timestep
@@ -197,9 +216,8 @@ def render_video(demo, fps=30, width=1280, height=720, out_name="best_grasp"):
     for k in range(n):
         demo.step()
         if k % substep == 0:
-            renderer.update_scene(demo.data, camera=cam)
-            renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SKYBOX] = False
-            frames.append(renderer.render())
+            rgb, depth = _render_pair(renderer, demo.data, cam)
+            frames.append(postfx.apply(rgb, depth, dof_focus=0.52) if film else rgb)
     renderer.close()
 
     os.makedirs(OUT_DIR, exist_ok=True)

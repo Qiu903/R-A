@@ -1,0 +1,104 @@
+<!--
+  第 2 级 · SO-101 简化模型（5 轴 + 夹爪）
+  =========================================
+  这份 MJCF 和第 1 级 src/level1_fk.py 里的 DH 参数是同一个几何的两种写法：
+      底座到肩轴 0.095 | 肩侧偏 0.030 | 大臂 0.116 | 小臂 0.135 | 腕 -> TCP 0.110
+  改动任何长度，两边都要一起改，否则跨校验会报错。
+
+  这一级的重点：关重力（<option gravity="0 0 0"/>），只验证关节能不能精确跟随。
+  关重力是为了少一个变量——重力补偿做错了会掩盖几何错误。
+
+  注意 XML 的层级：body 必须一层层嵌进去。
+  写成平级（<body> 全挂在 worldbody 下）不会报错，但每段连杆会各自飘在原点附近，
+  几何和动力学全错——这正是第一次跑炸掉的原因。
+-->
+<mujoco model="so101_5dof">
+
+  <!-- angle="radian"：文件里所有角度都用弧度，避免"到底传度还是弧度"这种低级坑 -->
+  <compiler angle="radian" autolimits="true"/>
+
+  <default>
+    <!-- 第 2 级不需要任何接触：连杆几何本来就是互相挨着的，一旦生成接触，
+         约束力会和执行器的力互相抵消，关节看起来"推不动"。
+         第 3 级再给夹爪和被抓物单独打开接触。 -->
+    <geom contype="0" conaffinity="0"/>
+  </default>
+
+  <!-- timestep 1ms 是仿真铁律；重力关掉 -->
+  <option timestep="0.001" gravity="0 0 0" iterations="50"/>
+
+  <!--
+    armature 是什么：电机转子惯量经减速器折算到关节侧之后的等效惯量。
+    为什么必须有：纯几何体的末端连杆惯量只有 1e-5 kg·m² 量级，
+    位置伺服一施加弹簧力，加速度能到 1e6 rad/s²，一个步长就发散（第一次就是这么炸的）。
+    真实 STS3215 减速比约 345，折算后确实是 0.01~0.1 这个量级，所以这不是"加个保险"，是补上漏掉的物理。
+  -->
+
+  <worldbody>
+
+    <!-- 底座：固定不动 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_column" type="cylinder" size="0.030 0.0475" pos="0 0 0.0475"
+            rgba="0.30 0.30 0.30 1"/>
+
+      <!-- J1 肩部回转：绕竖直轴。body 的 pos 就是关节轴所在位置 -->
+      <body name="shoulder" pos="0 0 0.095">
+        <joint name="j1_pan" type="hinge" axis="0 0 1" armature="0.10"
+               range="-3.1416 3.1416" damping="0.05"/>
+        <geom name="shoulder_box" type="box" size="0.026 0.026 0.026"
+              rgba="0.88 0.72 0.12 1"/>
+
+        <!-- J2 肩部俯仰：轴线沿 y，位置在 J1 轴侧偏 30mm 处 -->
+        <body name="upper_arm" pos="0.030 0 0">
+          <joint name="j2_lift" type="hinge" axis="0 1 0" armature="0.10"
+                 range="-1.6 1.6" damping="0.05"/>
+          <!-- 大臂：从关节沿 +x 伸出 116mm，所以几何体中心在 58mm 处 -->
+          <geom name="upper_arm_link" type="box" size="0.058 0.015 0.012" pos="0.058 0 0"
+                rgba="0.18 0.53 0.87 1"/>
+
+          <!-- J3 肘部俯仰 -->
+          <body name="lower_arm" pos="0.116 0 0">
+            <joint name="j3_elbow" type="hinge" axis="0 1 0" armature="0.08"
+                   range="-2.4 2.4" damping="0.05"/>
+            <!-- 小臂：从关节沿 +x 伸出 135mm，中心在 67.5mm 处 -->
+            <geom name="lower_arm_link" type="box" size="0.0675 0.013 0.010" pos="0.0675 0 0"
+                  rgba="0.18 0.53 0.87 1"/>
+
+            <!-- J4 腕部俯仰 -->
+            <body name="wrist" pos="0.135 0 0">
+              <joint name="j4_wrist_flex" type="hinge" axis="0 1 0" armature="0.05"
+                     range="-1.9 1.9" damping="0.03"/>
+              <geom name="wrist_box" type="box" size="0.014 0.012 0.012"
+                    rgba="0.06 0.67 0.52 1"/>
+
+              <!-- J5 腕部自转：绕前臂长轴（x 轴）转，只改朝向不改 TCP 位置 -->
+              <body name="tool" pos="0 0 0">
+                <joint name="j5_wrist_roll" type="hinge" axis="1 0 0" armature="0.03"
+                       range="-3.1416 3.1416" damping="0.02"/>
+                <geom name="gripper_body" type="box" size="0.030 0.012 0.012" pos="0.035 0 0"
+                      rgba="0.85 0.20 0.25 1"/>
+                <!-- TCP = 夹爪中心，位于前臂轴向 110mm 处 -->
+                <site name="tcp" pos="0.110 0 0" size="0.005" rgba="0.9 0.1 0.1 1"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+  </worldbody>
+
+  <actuator>
+    <!-- 位置执行器 = 把关节角"拉"到目标角的弹簧-阻尼伺服。
+         kp 是刚度（越大跟得越紧），kv 是阻尼。
+         注意这是理想化伺服：没有延迟、没有背隙、没有力矩上限。
+         真机的这些缺陷要在第 3 级和域随机化里补，不要在这里假装有。
+         kp 不能拍脑袋往大调：刚度过高 + 步长 1ms 会把数值积分直接搞发散。 -->
+    <position name="a_j1" joint="j1_pan"         kp="25" kv="1.5" ctrlrange="-3.1416 3.1416"/>
+    <position name="a_j2" joint="j2_lift"        kp="25" kv="1.5" ctrlrange="-1.6 1.6"/>
+    <position name="a_j3" joint="j3_elbow"       kp="20" kv="1.2" ctrlrange="-2.4 2.4"/>
+    <position name="a_j4" joint="j4_wrist_flex"  kp="12" kv="0.8" ctrlrange="-1.9 1.9"/>
+    <position name="a_j5" joint="j5_wrist_roll"  kp="6"  kv="0.4" ctrlrange="-3.1416 3.1416"/>
+  </actuator>
+
+</mujoco>

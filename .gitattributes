@@ -1,0 +1,6 @@
+# 统一用 LF，避免 Windows/Linux 协作时整份文件显示成改动过
+* text=auto eol=lf
+
+*.png binary
+*.gif binary
+*.mp4 binary

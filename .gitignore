@@ -1,0 +1,25 @@
+# 运行产物（图、视频）
+outputs/
+
+# 本地笔记与学习计划，不随代码发布
+docs/
+
+# 编辑器 / 工具目录
+.workbuddy/
+.vscode/
+.screenshots/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# MuJoCo 在数值发散时会自动生成这个日志
+MUJOCO_LOG.TXT
+
+# 系统文件
+.DS_Store
+Thumbs.db

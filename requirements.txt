@@ -1,0 +1,8 @@
+mujoco>=3.2
+numpy>=1.24
+matplotlib>=3.7
+pillow>=9.0
+
+# 可选：装了才会把录制结果输出成 mp4（否则退回 gif）
+# imageio>=2.31
+# imageio-ffmpeg>=0.4
